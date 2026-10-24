@@ -1,0 +1,1259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Faith's Trail Log</title>
+<style>
+/* ============================================================
+   FAITH'S TRAIL LOG  —  v3
+   New in this version:
+     • Temperature now converts live between °F and °C
+     • Day Hike / Multi-Day Trip toggle
+     • Multi-day trips hold a list of DAYS, each with its own
+       miles, gain, loss, weather, temp, campsite and notes
+     • Trip totals auto-calculate from the days (with override)
+     • Packing list per trip, with reusable checkboxes
+
+   Design concept: a paper field journal. Warm cream surface,
+   deep forest ink, trail-blaze orange accent. Trips hang off a
+   dashed "trail line" with a blaze marker at each stop.
+   Type is set LARGE on purpose (19-20px base) for easy reading.
+   ============================================================ */
+
+:root{
+  --paper:      #FAF7F0;
+  --card:       #FFFFFF;
+  --ink:        #1F2A24;
+  --ink-soft:   #46564E;
+  --blaze:      #C05621;
+  --blaze-dark: #96400F;
+  --moss:       #4A6B52;
+  --line:       #E3DCCD;
+  --radius:     14px;
+  --shadow:     0 1px 3px rgba(31,42,36,.07), 0 8px 24px rgba(31,42,36,.07);
+}
+
+*{box-sizing:border-box;}
+
+html{font-size:19px;}
+@media (min-width:900px){ html{font-size:20px;} }
+
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  line-height:1.6;
+  -webkit-text-size-adjust:100%;
+}
+
+h1,h2,h3{
+  font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+  line-height:1.15;margin:0;font-weight:700;
+}
+
+:focus-visible{outline:3px solid var(--blaze);outline-offset:2px;border-radius:4px;}
+
+.wrap{max-width:900px;margin:0 auto;padding:0 1.1rem 4rem;}
+
+/* ---------- HEADER with topographic contour motif ---------- */
+header.hero{
+  background:var(--moss);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='460' height='220' viewBox='0 0 460 220'%3E%3Cg fill='none' stroke='%23FAF7F0' stroke-width='1.6' opacity='0.30'%3E%3Cpath d='M-20 30 C 70 0,150 60,230 30 S 390 0,480 40'/%3E%3Cpath d='M-20 56 C 70 26,150 86,230 56 S 390 26,480 66'/%3E%3Cpath d='M-20 82 C 70 52,150 112,230 82 S 390 52,480 92'/%3E%3Cpath d='M-20 108 C 70 78,150 138,230 108 S 390 78,480 118'/%3E%3Cpath d='M-20 134 C 70 104,150 164,230 134 S 390 104,480 144'/%3E%3Cpath d='M-20 160 C 70 130,150 190,230 160 S 390 130,480 170'/%3E%3Cpath d='M-20 186 C 70 156,150 216,230 186 S 390 156,480 196'/%3E%3C/g%3E%3C/svg%3E");
+  background-size:460px 220px;
+  color:#FFF8EC;padding:2.6rem 0 2.9rem;border-bottom:5px solid var(--blaze);
+}
+header.hero .wrap{padding-bottom:0;}
+.eyebrow{text-transform:uppercase;letter-spacing:.16em;font-size:.72rem;font-weight:700;opacity:.9;margin:0 0 .4rem;}
+header.hero h1{font-size:2.9rem;letter-spacing:-.015em;}
+header.hero p.tagline{margin:.5rem 0 0;font-size:1.02rem;opacity:.92;max-width:34ch;}
+
+/* ---------- STATS ---------- */
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:.8rem;margin:-1.6rem 0 2rem;}
+@media (min-width:680px){ .stats{grid-template-columns:repeat(5,1fr);} }
+.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:1rem .7rem;text-align:center;}
+.stat .num{display:block;font-family:"Iowan Old Style",Palatino,Georgia,serif;font-size:1.85rem;font-weight:700;color:var(--blaze-dark);line-height:1.05;}
+.stat .lbl{display:block;font-size:.74rem;text-transform:uppercase;letter-spacing:.07em;font-weight:700;color:var(--ink-soft);margin-top:.3rem;}
+
+/* ---------- BUTTONS ---------- */
+button{font:inherit;cursor:pointer;border-radius:10px;transition:background .15s,transform .08s,border-color .15s;}
+button:active{transform:translateY(1px);}
+.btn-primary{background:var(--blaze);color:#fff;border:none;padding:.85rem 1.5rem;font-size:1.05rem;font-weight:700;box-shadow:var(--shadow);}
+.btn-primary:hover{background:var(--blaze-dark);}
+.btn-secondary{background:#fff;color:var(--ink);border:2px solid var(--line);padding:.6rem 1.05rem;font-size:.92rem;font-weight:600;}
+.btn-secondary:hover{border-color:var(--moss);background:#F6F3EA;}
+.btn-danger{background:#fff;color:#8E2A14;border:2px solid #EBD3CA;padding:.5rem .95rem;font-size:.88rem;font-weight:600;}
+.btn-danger:hover{background:#FBEFEB;border-color:#D9A392;}
+.btn-small{padding:.35rem .7rem;font-size:.82rem;}
+
+/* ---------- TOOLBAR / FILTERS ---------- */
+.toolbar{display:flex;flex-wrap:wrap;gap:.7rem;align-items:center;margin-bottom:1.3rem;}
+.toolbar .spacer{flex:1 1 auto;}
+.filters{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:1rem;display:grid;gap:.8rem;grid-template-columns:1fr;margin-bottom:1.8rem;box-shadow:var(--shadow);}
+@media (min-width:680px){ .filters{grid-template-columns:2fr 1fr 1fr 1fr;} }
+
+label{display:block;font-size:.8rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:.3rem;}
+.lab-note{font-weight:500;text-transform:none;letter-spacing:0;}
+
+input[type="text"],input[type="number"],input[type="date"],input[type="search"],select,textarea{
+  width:100%;font:inherit;font-size:1rem;color:var(--ink);background:#fff;
+  border:2px solid var(--line);border-radius:10px;padding:.62rem .7rem;
+}
+input:hover,select:hover,textarea:hover{border-color:#CFC6B2;}
+input:focus,select:focus,textarea:focus{border-color:var(--moss);outline:none;box-shadow:0 0 0 3px rgba(74,107,82,.2);}
+input[readonly]{background:#F1EDE2;color:var(--ink-soft);cursor:not-allowed;}
+textarea{min-height:5.5rem;resize:vertical;line-height:1.55;}
+
+/* ---------- TRAIL LINE ---------- */
+.trail{position:relative;padding-left:2.3rem;margin:0;}
+.trail::before{content:"";position:absolute;left:.72rem;top:1.2rem;bottom:1.2rem;width:3px;
+  background:repeating-linear-gradient(to bottom,var(--moss) 0 9px,transparent 9px 18px);opacity:.55;}
+@media (max-width:520px){ .trail{padding-left:1.7rem;} .trail::before{left:.42rem;} }
+
+.trip{position:relative;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow);padding:1.3rem 1.3rem 1.1rem;margin-bottom:1.3rem;}
+.trip::before{content:"";position:absolute;left:-1.96rem;top:1.75rem;width:15px;height:15px;border-radius:50%;
+  background:var(--blaze);border:3px solid var(--paper);box-shadow:0 0 0 2px var(--blaze);}
+@media (max-width:520px){ .trip::before{left:-1.42rem;} }
+
+.trip h3{font-size:1.45rem;margin-bottom:.15rem;}
+.trip .when{font-size:.95rem;color:var(--ink-soft);font-weight:600;margin:0 0 .85rem;}
+
+.chips{display:flex;flex-wrap:wrap;gap:.45rem;margin-bottom:.85rem;}
+.chip{background:#F4F1E8;border:1px solid var(--line);border-radius:999px;padding:.3rem .75rem;
+  font-size:.86rem;font-weight:600;color:var(--ink);white-space:nowrap;}
+.chip.gain{background:#E9F1E7;border-color:#C2D8BE;}
+.chip.loss{background:#EEEDF4;border-color:#C9C6DB;}
+.chip.finish{background:#FBF1DF;border-color:#E6D2A0;}
+.chip.trek{background:#E7EDF4;border-color:#BCCCE0;}
+.chip.diff-Easy{background:#E7F0E6;border-color:#BFD6BC;}
+.chip.diff-Moderate{background:#FBF0D8;border-color:#E6CF95;}
+.chip.diff-Hard{background:#F9E3D4;border-color:#E3B393;}
+.chip.diff-Strenuous{background:#F6D9D1;border-color:#DCA392;}
+
+.stars{color:var(--blaze);font-size:1.25rem;letter-spacing:.09em;margin-bottom:.6rem;}
+.stars .off{color:#D8D0BF;}
+.notes{margin:.2rem 0 .9rem;white-space:pre-wrap;border-left:4px solid var(--line);padding-left:.9rem;}
+
+/* Collapsible day-by-day + packing list on the card */
+details.fold{border:1px solid var(--line);border-radius:10px;background:#FCFAF4;margin:0 0 .85rem;}
+details.fold > summary{cursor:pointer;padding:.65rem .9rem;font-weight:700;font-size:.95rem;list-style:none;}
+details.fold > summary::-webkit-details-marker{display:none;}
+details.fold > summary::before{content:"▸ ";color:var(--blaze);font-weight:700;}
+details.fold[open] > summary::before{content:"▾ ";}
+details.fold > summary:hover{background:#F4F0E4;border-radius:10px;}
+.fold-body{padding:.2rem .9rem .9rem;}
+
+ol.daylist{margin:0;padding-left:1.3rem;}
+ol.daylist li{margin-bottom:.75rem;}
+ol.daylist .dhead{font-weight:700;}
+ol.daylist .dmeta{font-size:.88rem;color:var(--ink-soft);}
+ol.daylist .dnote{font-size:.92rem;white-space:pre-wrap;}
+
+ul.packlist{list-style:none;margin:0;padding:0;columns:2;column-gap:1.4rem;}
+@media (max-width:560px){ ul.packlist{columns:1;} }
+ul.packlist li{break-inside:avoid;margin-bottom:.3rem;font-size:.95rem;}
+ul.packlist label{display:flex;gap:.5rem;align-items:flex-start;text-transform:none;letter-spacing:0;
+  font-size:.95rem;font-weight:500;color:var(--ink);margin:0;cursor:pointer;}
+ul.packlist input[type="checkbox"]{width:1.15rem;height:1.15rem;margin-top:.22rem;flex:0 0 auto;accent-color:var(--moss);cursor:pointer;}
+ul.packlist input:checked + span{text-decoration:line-through;color:var(--ink-soft);}
+
+.trip .actions{display:flex;gap:.6rem;border-top:1px solid var(--line);padding-top:.85rem;flex-wrap:wrap;}
+
+/* ---------- EMPTY STATE ---------- */
+.empty{text-align:center;padding:3.2rem 1.5rem;background:var(--card);border:2px dashed var(--line);border-radius:var(--radius);}
+.empty h2{font-size:1.6rem;margin-bottom:.5rem;}
+.empty p{color:var(--ink-soft);max-width:38ch;margin:0 auto 1.3rem;}
+
+/* ---------- MODAL ---------- */
+.overlay{position:fixed;inset:0;background:rgba(31,42,36,.55);display:none;align-items:flex-start;
+  justify-content:center;padding:1.2rem;overflow-y:auto;z-index:50;}
+.overlay.open{display:flex;}
+.sheet{background:var(--paper);border-radius:18px;max-width:760px;width:100%;margin:auto;
+  box-shadow:0 20px 60px rgba(0,0,0,.35);border-top:6px solid var(--blaze);}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;padding:1.2rem 1.4rem;border-bottom:1px solid var(--line);}
+.sheet-head h2{font-size:1.6rem;}
+.icon-btn{background:none;border:2px solid transparent;font-size:1.7rem;line-height:1;padding:.1rem .55rem;color:var(--ink-soft);border-radius:8px;}
+.icon-btn:hover{background:#ECE7DA;color:var(--ink);}
+.sheet-body{padding:1.4rem;}
+.sheet-foot{display:flex;gap:.8rem;justify-content:flex-end;flex-wrap:wrap;padding:1.1rem 1.4rem;
+  border-top:1px solid var(--line);background:#F5F1E7;border-radius:0 0 18px 18px;}
+
+.field{margin-bottom:1.15rem;}
+.row{display:grid;gap:1.15rem;grid-template-columns:1fr;}
+@media (min-width:620px){ .row.two{grid-template-columns:1fr 1fr;} }
+
+fieldset.group{border:2px solid var(--line);border-radius:var(--radius);padding:1.1rem 1.1rem .2rem;
+  margin:0 0 1.15rem;background:#FCFAF4;}
+fieldset.group legend{font-size:.82rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--moss);padding:0 .45rem;}
+
+/* Trip-type toggle */
+.segmented{display:flex;gap:0;border:2px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;}
+.segmented button{flex:1;border:none;background:#fff;padding:.8rem .6rem;font-size:1rem;font-weight:700;color:var(--ink-soft);border-radius:0;}
+.segmented button[aria-pressed="true"]{background:var(--moss);color:#FFF8EC;}
+.segmented button:not([aria-pressed="true"]):hover{background:#F2EEE3;}
+
+/* Paired unit inputs */
+.pair{display:grid;grid-template-columns:1fr auto 1fr;gap:.5rem;align-items:center;}
+.pair .eq{font-weight:700;color:var(--ink-soft);font-size:1.1rem;}
+.unit{position:relative;}
+.unit .suffix{position:absolute;right:.65rem;top:50%;transform:translateY(-50%);font-size:.82rem;
+  font-weight:700;color:var(--ink-soft);pointer-events:none;}
+.unit input{padding-right:2.8rem;}
+.hint{font-size:.82rem;color:var(--ink-soft);margin:.35rem 0 0;text-transform:none;letter-spacing:0;font-weight:500;}
+.calcnote{font-size:.85rem;color:var(--moss);font-weight:700;margin:.1rem 0 1rem;min-height:1.2em;}
+
+/* Checkbox control row */
+.checkrow{display:flex;align-items:center;gap:.6rem;margin:0 0 1rem;}
+.checkrow input{width:1.25rem;height:1.25rem;accent-color:var(--moss);cursor:pointer;flex:0 0 auto;}
+.checkrow label{margin:0;text-transform:none;letter-spacing:0;font-size:.95rem;font-weight:600;color:var(--ink);cursor:pointer;}
+
+/* ---------- DAY ROWS ---------- */
+#days{margin-bottom:.9rem;}
+.day{border:2px solid var(--line);border-radius:12px;background:#fff;padding:.9rem;margin-bottom:.9rem;}
+.day-head{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin-bottom:.8rem;}
+.day-head .dayno{font-family:"Iowan Old Style",Palatino,Georgia,serif;font-size:1.2rem;font-weight:700;color:var(--blaze-dark);}
+.day-grid{display:grid;gap:.85rem;grid-template-columns:1fr;}
+@media (min-width:620px){ .day-grid{grid-template-columns:1fr 1fr;} .day-grid .full{grid-column:1/-1;} }
+.day-grid label{font-size:.72rem;}
+.day-grid input,.day-grid select{font-size:.95rem;padding:.5rem .6rem;}
+.day-grid .unit input{padding-right:2.6rem;}
+.daytotals{background:#EDF2EC;border:2px solid #C7D8C6;border-radius:12px;padding:.8rem 1rem;
+  font-size:.95rem;font-weight:700;color:#24402B;margin-bottom:1rem;}
+
+/* Star picker */
+.starpick{display:flex;gap:.3rem;align-items:center;flex-wrap:wrap;}
+.starpick button{background:none;border:2px solid transparent;font-size:2rem;line-height:1;padding:.1rem .2rem;color:#D8D0BF;border-radius:8px;}
+.starpick button[aria-pressed="true"]{color:var(--blaze);}
+.starpick button:hover{color:var(--blaze-dark);}
+
+/* ---------- BANNERS ---------- */
+.banner{border-radius:var(--radius);padding:1rem 1.1rem;margin:1.4rem 0;font-size:.95rem;border:2px solid;}
+.banner.warn{background:#FDF3E3;border-color:#E6C98D;color:#5C3D06;}
+.banner strong{display:block;margin-bottom:.25rem;font-size:1.02rem;}
+
+footer.sitefoot{margin-top:3rem;padding-top:1.4rem;border-top:1px solid var(--line);font-size:.88rem;color:var(--ink-soft);text-align:center;}
+.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
+
+/* ---------- PRINT ---------- */
+@media print{
+  .toolbar,.filters,.trip .actions,.overlay,.banner,header.hero{display:none !important;}
+  body{background:#fff;font-size:12pt;}
+  .trip{break-inside:avoid;box-shadow:none;border-color:#999;}
+  .trail{padding-left:0;} .trail::before,.trip::before{display:none;}
+  details.fold{border:none;background:none;} details.fold > summary{display:none;}
+  .fold-body{padding:0;}
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow">Backpacking &amp; Hiking Journal</p>
+    <h1>Faith's Trail Log</h1>
+    <p class="tagline">Every mile, every summit, every night under the stars — all in one place.</p>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="stats" aria-label="Lifetime totals">
+    <div class="stat"><span class="num" id="statTrips">0</span><span class="lbl">Trips</span></div>
+    <div class="stat"><span class="num" id="statDist">0</span><span class="lbl">Miles</span></div>
+    <div class="stat"><span class="num" id="statGain">0</span><span class="lbl">Ft Climbed</span></div>
+    <div class="stat"><span class="num" id="statLoss">0</span><span class="lbl">Ft Descended</span></div>
+    <div class="stat"><span class="num" id="statNights">0</span><span class="lbl">Nights Out</span></div>
+  </section>
+
+  <div id="storageWarning" class="banner warn" style="display:none">
+    <strong>Heads up — this browser isn't saving automatically.</strong>
+    Your trips won't be remembered after you close this page. Use <em>Save Backup File</em> before you leave,
+    then <em>Load Backup File</em> next time.
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-primary" id="addBtn">+ Add a Trip</button>
+    <span class="spacer"></span>
+    <button class="btn-secondary" id="exportBtn" title="Download all your trips as one file">⬇ Save Backup File</button>
+    <button class="btn-secondary" id="importBtn" title="Restore trips from a backup file">⬆ Load Backup File</button>
+    <input type="file" id="fileInput" accept=".json,application/json" class="visually-hidden">
+  </div>
+
+  <section class="filters" aria-label="Search and filter trips">
+    <div>
+      <label for="q">Search</label>
+      <input type="search" id="q" placeholder="Trail, place, notes, gear, or who you hiked with">
+    </div>
+    <div>
+      <label for="fYear">Year</label>
+      <select id="fYear"><option value="">All years</option></select>
+    </div>
+    <div>
+      <label for="fDiff">Difficulty</label>
+      <select id="fDiff">
+        <option value="">All</option>
+        <option>Easy</option><option>Moderate</option><option>Hard</option><option>Strenuous</option>
+      </select>
+    </div>
+    <div>
+      <label for="fSort">Sort by</label>
+      <select id="fSort">
+        <option value="new">Newest first</option>
+        <option value="old">Oldest first</option>
+        <option value="far">Longest distance</option>
+        <option value="gain">Most elevation gain</option>
+        <option value="loss">Most elevation loss</option>
+        <option value="finish">Highest finish</option>
+        <option value="best">Highest rated</option>
+      </select>
+    </div>
+  </section>
+
+  <p id="countLine" style="color:var(--ink-soft);font-weight:600;margin:0 0 1rem;"></p>
+
+  <section class="trail" id="list" aria-live="polite"></section>
+
+  <footer class="sitefoot">
+    <p><strong>Remember:</strong> trips are saved on this device only. Use <em>Save Backup File</em>
+    to keep a copy, share it with family, or move your log to another computer, tablet, or phone.</p>
+  </footer>
+</main>
+
+<!-- ============ ADD / EDIT FORM ============ -->
+<div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2 id="sheetTitle">Add a Trip</h2>
+      <button class="icon-btn" id="closeBtn" aria-label="Close without saving">&times;</button>
+    </div>
+
+    <form id="tripForm" novalidate>
+      <div class="sheet-body">
+
+        <!-- Trip type sets how the rest of the form behaves -->
+        <div class="field">
+          <label id="typeLabel">Trip Length</label>
+          <div class="segmented" role="group" aria-labelledby="typeLabel">
+            <button type="button" id="modeDay"   aria-pressed="true">🥾 Day Hike</button>
+            <button type="button" id="modeMulti" aria-pressed="false">🏕️ Multi-Day Trip</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="fName">Trail or Trip Name <span style="color:var(--blaze-dark)">(required)</span></label>
+          <input type="text" id="fName" required placeholder="e.g. Mount Rogers Loop">
+        </div>
+
+        <div class="row two">
+          <div class="field">
+            <label for="fDate" id="dateLabel">Date</label>
+            <input type="date" id="fDate">
+          </div>
+          <div class="field">
+            <label for="fLoc">Location</label>
+            <input type="text" id="fLoc" placeholder="e.g. Grayson Highlands, VA">
+          </div>
+        </div>
+
+        <!-- ======== DAY-BY-DAY (multi-day trips only) ======== -->
+        <fieldset class="group" id="daysGroup" style="display:none">
+          <legend>Day by Day</legend>
+          <p class="hint" style="margin-bottom:.9rem">Every field is optional — fill in what you remember.</p>
+          <div id="days"></div>
+          <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem;">
+            <button type="button" class="btn-secondary" id="addDayBtn">+ Add Day</button>
+            <button type="button" class="btn-secondary btn-small" id="fillDatesBtn" title="Number the days forward from the start date">↻ Fill dates from start</button>
+          </div>
+          <div class="daytotals" id="dayTotals">No days added yet.</div>
+        </fieldset>
+
+        <!-- ======== TOTALS ======== -->
+        <fieldset class="group">
+          <legend id="totalsLegend">Distance &amp; Elevation</legend>
+
+          <div class="checkrow" id="autoRow" style="display:none">
+            <input type="checkbox" id="autoTotals" checked>
+            <label for="autoTotals">Add up the days for me</label>
+          </div>
+
+          <div class="field">
+            <label for="fMi">Total Distance</label>
+            <div class="pair">
+              <div class="unit"><input type="number" id="fMi" step="any" min="0" inputmode="decimal" placeholder="0"><span class="suffix">mi</span></div>
+              <span class="eq" aria-hidden="true">=</span>
+              <div class="unit"><input type="number" id="fKm" step="any" min="0" inputmode="decimal" placeholder="0"><span class="suffix">km</span></div>
+            </div>
+            <p class="hint">Type in either box — the other one converts for you.</p>
+          </div>
+
+          <div class="field">
+            <label for="fGainFt">Elevation Gain <span class="lab-note">(total climbing)</span></label>
+            <div class="pair">
+              <div class="unit"><input type="number" id="fGainFt" step="any" min="0" inputmode="decimal" placeholder="0"><span class="suffix">ft</span></div>
+              <span class="eq" aria-hidden="true">=</span>
+              <div class="unit"><input type="number" id="fGainM" step="any" min="0" inputmode="decimal" placeholder="0"><span class="suffix">m</span></div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="fLossFt">Elevation Loss <span class="lab-note">(total descending)</span></label>
+            <div class="pair">
+              <div class="unit"><input type="number" id="fLossFt" step="any" min="0" inputmode="decimal" placeholder="0"><span class="suffix">ft</span></div>
+              <span class="eq" aria-hidden="true">=</span>
+              <div class="unit"><input type="number" id="fLossM" step="any" min="0" inputmode="decimal" placeholder="0"><span class="suffix">m</span></div>
+            </div>
+            <p class="hint">Enter as a positive number. On a loop, this usually matches the gain.</p>
+          </div>
+
+          <div class="field">
+            <label for="fFinFt">Finish Elevation <span class="lab-note">(where the hike ended)</span></label>
+            <div class="pair">
+              <div class="unit"><input type="number" id="fFinFt" step="any" inputmode="decimal" placeholder="0"><span class="suffix">ft</span></div>
+              <span class="eq" aria-hidden="true">=</span>
+              <div class="unit"><input type="number" id="fFinM" step="any" inputmode="decimal" placeholder="0"><span class="suffix">m</span></div>
+            </div>
+          </div>
+
+          <p class="calcnote" id="calcNote"></p>
+        </fieldset>
+
+        <div class="row two">
+          <div class="field">
+            <label for="fNights" id="nightsLabel">Nights Out</label>
+            <input type="number" id="fNights" min="0" step="1" placeholder="0">
+            <p class="hint" id="nightsHint">Leave as 0 for a day hike.</p>
+          </div>
+          <div class="field">
+            <label for="fDiffIn">Difficulty</label>
+            <select id="fDiffIn">
+              <option value="">Not rated</option>
+              <option>Easy</option><option>Moderate</option><option>Hard</option><option>Strenuous</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- ======== WEATHER (overall) ======== -->
+        <fieldset class="group">
+          <legend id="weatherLegend">Weather</legend>
+          <div class="field">
+            <label for="fWeather">Conditions</label>
+            <select id="fWeather">
+              <option value="">Not recorded</option>
+              <option>☀️ Sunny</option><option>⛅ Partly cloudy</option><option>☁️ Overcast</option>
+              <option>🌧️ Rain</option><option>⛈️ Thunderstorms</option><option>❄️ Snow</option>
+              <option>🌫️ Fog</option><option>💨 Windy</option><option>🥵 Hot</option><option>🥶 Cold</option>
+              <option>🌦️ Mixed / changeable</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="fTempF">Temperature</label>
+            <div class="pair">
+              <div class="unit"><input type="number" id="fTempF" step="any" inputmode="decimal" placeholder="0"><span class="suffix">°F</span></div>
+              <span class="eq" aria-hidden="true">=</span>
+              <div class="unit"><input type="number" id="fTempC" step="any" inputmode="decimal" placeholder="0"><span class="suffix">°C</span></div>
+            </div>
+            <p class="hint">Type in either box — negatives are fine.</p>
+          </div>
+        </fieldset>
+
+        <div class="field">
+          <label for="fWho">Who I Went With</label>
+          <input type="text" id="fWho" placeholder="e.g. Samantha, Dave, and the dog">
+        </div>
+
+        <!-- ======== PACKING LIST ======== -->
+        <fieldset class="group">
+          <legend>Packing List</legend>
+          <div class="field">
+            <label for="packCopy">Start From a Previous Trip <span class="lab-note">(optional)</span></label>
+            <select id="packCopy"><option value="">— choose a trip to copy its list —</option></select>
+          </div>
+          <div class="field">
+            <label for="fPacking">Gear &amp; Supplies</label>
+            <textarea id="fPacking" rows="7" placeholder="One item per line:&#10;Tent + footprint&#10;20° sleeping bag&#10;Sleeping pad&#10;Water filter&#10;Headlamp + spare batteries&#10;Rain shell&#10;Trekking poles&#10;3 days food"></textarea>
+            <p class="hint">Put one item on each line. On the trip card they become a checklist you can tick off while packing.</p>
+          </div>
+        </fieldset>
+
+        <div class="field">
+          <label id="ratingLabel">My Rating</label>
+          <div class="starpick" id="starPick" role="group" aria-labelledby="ratingLabel">
+            <button type="button" data-v="1" aria-pressed="false" aria-label="1 star">★</button>
+            <button type="button" data-v="2" aria-pressed="false" aria-label="2 stars">★</button>
+            <button type="button" data-v="3" aria-pressed="false" aria-label="3 stars">★</button>
+            <button type="button" data-v="4" aria-pressed="false" aria-label="4 stars">★</button>
+            <button type="button" data-v="5" aria-pressed="false" aria-label="5 stars">★</button>
+            <button type="button" id="clearStars" style="font-size:.9rem;color:var(--ink-soft);margin-left:.5rem;">Clear</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="fNotes">Notes &amp; Memories</label>
+          <textarea id="fNotes" placeholder="Wildflowers everywhere on the ridge. Saw three ponies. Water source dry at mile 6 — carry extra."></textarea>
+        </div>
+
+      </div>
+
+      <div class="sheet-foot">
+        <button type="button" class="btn-secondary" id="cancelBtn">Cancel</button>
+        <button type="submit" class="btn-primary" id="saveBtn">Save Trip</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+/* ===========================================================
+   DATA MODEL
+   A trip is:
+     { id, name, date, location, type:'day'|'multi',
+       mi, ft, lossFt, finishFt, nights, autoTotals,
+       difficulty, weather, tempF, who, rating, notes,
+       packing:"line\nline", packChecked:{index:true},
+       days:[ {date, mi, gainFt, lossFt, weather, tempF, camp, note} ] }
+
+   Distance is always stored in MILES, elevation in FEET,
+   temperature in °F. Metric is calculated on the fly so the
+   numbers can never drift apart.
+   =========================================================== */
+var KEY = 'faith_trail_log_v1';          // unchanged — old entries survive
+var MI_PER_KM = 1.609344;
+var M_PER_FT  = 0.3048;
+
+var trips = [], editingId = null, pendingRating = 0, storageOK = true;
+var mode = 'day';
+
+function loadData(){
+  try{
+    var raw = localStorage.getItem(KEY);
+    trips = raw ? JSON.parse(raw) : [];
+    if(!Array.isArray(trips)) trips = [];
+  }catch(e){ storageOK = false; trips = []; }
+
+  /* Gentle upgrade of records saved by earlier versions */
+  for(var i=0;i<trips.length;i++){
+    var t = trips[i];
+    if(!t.type) t.type = (t.nights > 0) ? 'multi' : 'day';
+    if(!Array.isArray(t.days)) t.days = [];
+    if(t.tempF === undefined) t.tempF = (t.temp !== undefined ? t.temp : null);
+    if(!t.packing) t.packing = '';
+    if(!t.packChecked) t.packChecked = {};
+  }
+}
+function saveData(){
+  try{ localStorage.setItem(KEY, JSON.stringify(trips)); }
+  catch(e){ storageOK = false; document.getElementById('storageWarning').style.display='block'; }
+}
+
+/* ---------- helpers ---------- */
+function $(id){ return document.getElementById(id); }
+function esc(s){
+  return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function num(v){ var n = parseFloat(v); return isNaN(n) ? null : n; }
+function trim(n,dec){ if(n==null||isNaN(n)) return ''; return String(parseFloat(Number(n).toFixed(dec))); }
+function commas(n){ return Math.round(n).toLocaleString('en-US'); }
+
+/* Temperature is a formula, not a factor */
+function fToC(f){ return (f - 32) * 5 / 9; }
+function cToF(c){ return c * 9 / 5 + 32; }
+
+var MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+function prettyDate(d){
+  if(!d) return 'No date recorded';
+  var p=d.split('-'); if(p.length!==3) return d;
+  return MONTHS[parseInt(p[1],10)-1]+' '+parseInt(p[2],10)+', '+p[0];
+}
+function shortDate(d){
+  if(!d) return '';
+  var p=d.split('-'); if(p.length!==3) return d;
+  return MONTHS[parseInt(p[1],10)-1].slice(0,3)+' '+parseInt(p[2],10);
+}
+/* Shift an ISO date by n days, using UTC so time zones can't slide it */
+function shiftDate(iso,n){
+  var p=iso.split('-'); if(p.length!==3) return '';
+  var d=new Date(Date.UTC(+p[0],+p[1]-1,+p[2]));
+  d.setUTCDate(d.getUTCDate()+n);
+  return d.toISOString().slice(0,10);
+}
+function starRow(r){ var o=''; for(var i=1;i<=5;i++) o += (i<=r?'★':'<span class="off">★</span>'); return o; }
+
+/* ===========================================================
+   LIVE UNIT CONVERSION
+   Generalised to take two conversion FUNCTIONS, so it handles
+   both simple factors (mi/km) and formulas (°F/°C).
+   Setting .value in JS doesn't fire 'input', so no loops.
+   =========================================================== */
+function linkPair(aEl,bEl,aToB,bToA,decA,decB,after){
+  aEl.addEventListener('input',function(){
+    bEl.value = aEl.value==='' ? '' : trim(aToB(num(aEl.value)),decB);
+    if(after) after();
+  });
+  bEl.addEventListener('input',function(){
+    aEl.value = bEl.value==='' ? '' : trim(bToA(num(bEl.value)),decA);
+    if(after) after();
+  });
+}
+
+/* start = finish - gain + loss */
+function updateCalcNote(){
+  var gain=num($('fGainFt').value), loss=num($('fLossFt').value), finish=num($('fFinFt').value), bits=[];
+  if(gain!==null||loss!==null){
+    var net=(gain||0)-(loss||0);
+    bits.push('Net change: '+(net>0?'+':'')+commas(net)+' ft');
+  }
+  if(finish!==null&&(gain!==null||loss!==null)){
+    bits.push('Started around '+commas(finish-(gain||0)+(loss||0))+' ft');
+  }
+  $('calcNote').textContent = bits.join('  ·  ');
+}
+
+/* ===========================================================
+   DAY ROWS
+   =========================================================== */
+var WEATHER_OPTS = ['','☀️ Sunny','⛅ Partly cloudy','☁️ Overcast','🌧️ Rain','⛈️ Thunderstorms',
+                    '❄️ Snow','🌫️ Fog','💨 Windy','🥵 Hot','🥶 Cold'];
+
+function weatherSelectHTML(sel){
+  var h='';
+  for(var i=0;i<WEATHER_OPTS.length;i++){
+    var v=WEATHER_OPTS[i], lbl = v==='' ? 'Not recorded' : v;
+    h += '<option value="'+esc(v)+'"'+(v===sel?' selected':'')+'>'+esc(lbl)+'</option>';
+  }
+  return h;
+}
+
+function dayRowHTML(i,d){
+  d = d || {};
+  var mi = d.mi!=null ? trim(d.mi,2) : '';
+  var km = d.mi!=null ? trim(d.mi*MI_PER_KM,2) : '';
+  var gf = d.gainFt!=null ? trim(d.gainFt,0) : '';
+  var gm = d.gainFt!=null ? trim(d.gainFt*M_PER_FT,0) : '';
+  var lf = d.lossFt!=null ? trim(d.lossFt,0) : '';
+  var lm = d.lossFt!=null ? trim(d.lossFt*M_PER_FT,0) : '';
+  var tf = d.tempF!=null ? trim(d.tempF,0) : '';
+  var tc = d.tempF!=null ? trim(fToC(d.tempF),0) : '';
+
+  return ''+
+  '<div class="day">'+
+    '<div class="day-head">'+
+      '<span class="dayno">Day '+(i+1)+'</span>'+
+      '<button type="button" class="btn-danger btn-small" data-act="removeDay">Remove</button>'+
+    '</div>'+
+    '<div class="day-grid">'+
+      '<div><label>Date</label><input type="date" data-f="date" value="'+esc(d.date||'')+'"></div>'+
+      '<div><label>Miles Hiked</label><div class="pair">'+
+        '<div class="unit"><input type="number" step="any" min="0" inputmode="decimal" data-f="mi" value="'+mi+'" placeholder="0"><span class="suffix">mi</span></div>'+
+        '<span class="eq" aria-hidden="true">=</span>'+
+        '<div class="unit"><input type="number" step="any" min="0" inputmode="decimal" data-f="km" value="'+km+'" placeholder="0"><span class="suffix">km</span></div>'+
+      '</div></div>'+
+      '<div><label>Elevation Gain</label><div class="pair">'+
+        '<div class="unit"><input type="number" step="any" min="0" inputmode="decimal" data-f="gainFt" value="'+gf+'" placeholder="0"><span class="suffix">ft</span></div>'+
+        '<span class="eq" aria-hidden="true">=</span>'+
+        '<div class="unit"><input type="number" step="any" min="0" inputmode="decimal" data-f="gainM" value="'+gm+'" placeholder="0"><span class="suffix">m</span></div>'+
+      '</div></div>'+
+      '<div><label>Elevation Loss</label><div class="pair">'+
+        '<div class="unit"><input type="number" step="any" min="0" inputmode="decimal" data-f="lossFt" value="'+lf+'" placeholder="0"><span class="suffix">ft</span></div>'+
+        '<span class="eq" aria-hidden="true">=</span>'+
+        '<div class="unit"><input type="number" step="any" min="0" inputmode="decimal" data-f="lossM" value="'+lm+'" placeholder="0"><span class="suffix">m</span></div>'+
+      '</div></div>'+
+      '<div><label>Weather</label><select data-f="weather">'+weatherSelectHTML(d.weather||'')+'</select></div>'+
+      '<div><label>Temperature</label><div class="pair">'+
+        '<div class="unit"><input type="number" step="any" inputmode="decimal" data-f="tempF" value="'+tf+'" placeholder="0"><span class="suffix">°F</span></div>'+
+        '<span class="eq" aria-hidden="true">=</span>'+
+        '<div class="unit"><input type="number" step="any" inputmode="decimal" data-f="tempC" value="'+tc+'" placeholder="0"><span class="suffix">°C</span></div>'+
+      '</div></div>'+
+      '<div class="full"><label>Where I Camped</label><input type="text" data-f="camp" value="'+esc(d.camp||'')+'" placeholder="e.g. Thomas Knob Shelter"></div>'+
+      '<div class="full"><label>Notes for the Day</label><input type="text" data-f="note" value="'+esc(d.note||'')+'" placeholder="e.g. Ponies at the ridge, creek crossing was high"></div>'+
+    '</div>'+
+  '</div>';
+}
+
+function renumberDays(){
+  var rows = $('days').querySelectorAll('.day');
+  for(var i=0;i<rows.length;i++){
+    rows[i].querySelector('.dayno').textContent = 'Day ' + (i+1);
+  }
+}
+
+function addDay(d){
+  var box = $('days');
+  var i = box.querySelectorAll('.day').length;
+  if(!d && $('fDate').value) d = { date: shiftDate($('fDate').value, i) };
+  var temp = document.createElement('div');
+  temp.innerHTML = dayRowHTML(i, d);
+  box.appendChild(temp.firstChild);
+  recalcTotals();
+}
+
+function readDays(){
+  var out = [], rows = $('days').querySelectorAll('.day');
+  for(var i=0;i<rows.length;i++){
+    var r = rows[i];
+    function g(f){ var el = r.querySelector('[data-f="'+f+'"]'); return el ? el.value : ''; }
+    out.push({
+      date:    g('date'),
+      mi:      num(g('mi')),
+      gainFt:  num(g('gainFt')),
+      lossFt:  num(g('lossFt')),
+      weather: g('weather'),
+      tempF:   num(g('tempF')),
+      camp:    g('camp').trim(),
+      note:    g('note').trim()
+    });
+  }
+  return out;
+}
+
+/* Sum the days into the totals fields (unless she's overriding) */
+function recalcTotals(){
+  var days = readDays();
+  var n = days.length;
+
+  if(n === 0){
+    $('dayTotals').textContent = 'No days added yet.';
+  }else{
+    var mi=0,g=0,l=0,any=false;
+    for(var i=0;i<n;i++){
+      if(days[i].mi!=null){ mi+=days[i].mi; any=true; }
+      if(days[i].gainFt!=null){ g+=days[i].gainFt; any=true; }
+      if(days[i].lossFt!=null){ l+=days[i].lossFt; any=true; }
+    }
+    $('dayTotals').textContent =
+      n + (n===1?' day':' days') + '  ·  ' + Math.max(0,n-1) + (n-1===1?' night':' nights') +
+      (any ? '  ·  ' + trim(mi,2) + ' mi  ·  ▲' + commas(g) + ' ft  ·  ▼' + commas(l) + ' ft' : '');
+  }
+
+  if(mode !== 'multi' || !$('autoTotals').checked) return;
+
+  var tMi=0,tG=0,tL=0,hasMi=false,hasG=false,hasL=false;
+  for(var j=0;j<n;j++){
+    if(days[j].mi!=null){ tMi+=days[j].mi; hasMi=true; }
+    if(days[j].gainFt!=null){ tG+=days[j].gainFt; hasG=true; }
+    if(days[j].lossFt!=null){ tL+=days[j].lossFt; hasL=true; }
+  }
+  $('fMi').value     = hasMi ? trim(tMi,2) : '';
+  $('fKm').value     = hasMi ? trim(tMi*MI_PER_KM,2) : '';
+  $('fGainFt').value = hasG  ? trim(tG,0) : '';
+  $('fGainM').value  = hasG  ? trim(tG*M_PER_FT,0) : '';
+  $('fLossFt').value = hasL  ? trim(tL,0) : '';
+  $('fLossM').value  = hasL  ? trim(tL*M_PER_FT,0) : '';
+  $('fNights').value = n > 0 ? Math.max(0,n-1) : '';
+  updateCalcNote();
+}
+
+/* Grey out the auto-filled totals so it's obvious they're computed */
+function applyTotalsLock(){
+  var locked = (mode==='multi' && $('autoTotals').checked);
+  var ids = ['fMi','fKm','fGainFt','fGainM','fLossFt','fLossM','fNights'];
+  for(var i=0;i<ids.length;i++){
+    $(ids[i]).readOnly = locked;
+  }
+}
+
+/* ===========================================================
+   MODE TOGGLE
+   =========================================================== */
+function setMode(m){
+  mode = m;
+  $('modeDay').setAttribute('aria-pressed', m==='day' ? 'true':'false');
+  $('modeMulti').setAttribute('aria-pressed', m==='multi' ? 'true':'false');
+
+  var multi = (m==='multi');
+  $('daysGroup').style.display = multi ? '' : 'none';
+  $('autoRow').style.display   = multi ? '' : 'none';
+  $('dateLabel').textContent   = multi ? 'Start Date' : 'Date';
+  $('totalsLegend').textContent= multi ? 'Trip Totals' : 'Distance & Elevation';
+  $('weatherLegend').textContent = multi ? 'Weather Overall' : 'Weather';
+  $('nightsLabel').textContent = 'Nights Out';
+  $('nightsHint').textContent  = multi
+    ? 'Filled in from your days — usually one less than the number of days.'
+    : 'Leave as 0 for a day hike.';
+
+  if(multi && $('days').querySelectorAll('.day').length === 0) addDay();
+  applyTotalsLock();
+  recalcTotals();
+}
+
+/* ===========================================================
+   RENDERING THE LIST
+   =========================================================== */
+function renderStats(){
+  var d=0,g=0,l=0,n=0;
+  for(var i=0;i<trips.length;i++){
+    d += trips[i].mi||0; g += trips[i].ft||0;
+    l += trips[i].lossFt||0; n += trips[i].nights||0;
+  }
+  $('statTrips').textContent  = trips.length;
+  $('statDist').textContent   = d>=100 ? commas(d) : (trim(d,1)||'0');
+  $('statGain').textContent   = commas(g);
+  $('statLoss').textContent   = commas(l);
+  $('statNights').textContent = n;
+}
+
+function renderYearOptions(){
+  var sel=$('fYear'), cur=sel.value, years={};
+  for(var i=0;i<trips.length;i++){ if(trips[i].date) years[trips[i].date.slice(0,4)]=true; }
+  var list=Object.keys(years).sort().reverse();
+  sel.innerHTML='<option value="">All years</option>';
+  for(var j=0;j<list.length;j++){
+    var o=document.createElement('option'); o.value=list[j]; o.textContent=list[j]; sel.appendChild(o);
+  }
+  sel.value=cur;
+}
+
+function tripHaystack(t){
+  var parts=[t.name,t.location,t.notes,t.who,t.weather,t.difficulty,t.packing];
+  if(t.days) for(var i=0;i<t.days.length;i++){ parts.push(t.days[i].camp, t.days[i].note); }
+  return parts.join(' ').toLowerCase();
+}
+
+function visibleTrips(){
+  var q=$('q').value.toLowerCase().trim(), yr=$('fYear').value,
+      diff=$('fDiff').value, sort=$('fSort').value;
+
+  var out = trips.filter(function(t){
+    if(yr && (t.date||'').slice(0,4)!==yr) return false;
+    if(diff && t.difficulty!==diff) return false;
+    if(q && tripHaystack(t).indexOf(q)===-1) return false;
+    return true;
+  });
+
+  out.sort(function(a,b){
+    if(sort==='old')    return (a.date||'').localeCompare(b.date||'');
+    if(sort==='far')    return (b.mi||0)-(a.mi||0);
+    if(sort==='gain')   return (b.ft||0)-(a.ft||0);
+    if(sort==='loss')   return (b.lossFt||0)-(a.lossFt||0);
+    if(sort==='finish') return (b.finishFt==null?-Infinity:b.finishFt)-(a.finishFt==null?-Infinity:a.finishFt);
+    if(sort==='best')   return (b.rating||0)-(a.rating||0);
+    return (b.date||'').localeCompare(a.date||'');
+  });
+  return out;
+}
+
+function dateRangeLabel(t){
+  if(t.type!=='multi' || !t.days || t.days.length===0) return prettyDate(t.date);
+  var last=null;
+  for(var i=t.days.length-1;i>=0;i--){ if(t.days[i].date){ last=t.days[i].date; break; } }
+  if(!last || last===t.date) return prettyDate(t.date);
+  return prettyDate(t.date) + ' – ' + prettyDate(last);
+}
+
+function daysHTML(t){
+  if(!t.days || t.days.length===0) return '';
+  var h = '<details class="fold"><summary>View all '+t.days.length+' days</summary><div class="fold-body"><ol class="daylist">';
+  for(var i=0;i<t.days.length;i++){
+    var d=t.days[i], meta=[];
+    if(d.mi!=null)     meta.push(trim(d.mi,2)+' mi / '+trim(d.mi*MI_PER_KM,2)+' km');
+    if(d.gainFt!=null) meta.push('▲'+commas(d.gainFt)+' ft');
+    if(d.lossFt!=null) meta.push('▼'+commas(d.lossFt)+' ft');
+    if(d.weather)      meta.push(d.weather);
+    if(d.tempF!=null)  meta.push(trim(d.tempF,0)+'°F / '+trim(fToC(d.tempF),0)+'°C');
+    if(d.camp)         meta.push('🏕️ '+d.camp);
+
+    h += '<li><span class="dhead">Day '+(i+1)+(d.date?' — '+esc(shortDate(d.date)):'')+'</span>'+
+         (meta.length?'<div class="dmeta">'+esc(meta.join('  ·  '))+'</div>':'')+
+         (d.note?'<div class="dnote">'+esc(d.note)+'</div>':'')+'</li>';
+  }
+  return h + '</ol></div></details>';
+}
+
+function packingHTML(t){
+  if(!t.packing) return '';
+  var items = t.packing.split('\n');
+  var clean = [];
+  for(var i=0;i<items.length;i++){ if(items[i].trim()!=='') clean.push({txt:items[i].trim(),idx:i}); }
+  if(clean.length===0) return '';
+
+  var done=0;
+  for(var k=0;k<clean.length;k++){ if(t.packChecked && t.packChecked[clean[k].idx]) done++; }
+
+  var h = '<details class="fold"><summary>🎒 Packing list — '+done+' of '+clean.length+' packed</summary>'+
+          '<div class="fold-body"><ul class="packlist">';
+  for(var j=0;j<clean.length;j++){
+    var on = t.packChecked && t.packChecked[clean[j].idx];
+    h += '<li><label><input type="checkbox" class="packbox" data-trip="'+esc(t.id)+'" data-i="'+clean[j].idx+'"'+(on?' checked':'')+'>'+
+         '<span>'+esc(clean[j].txt)+'</span></label></li>';
+  }
+  h += '</ul><button type="button" class="btn-secondary btn-small" data-act="unpack" data-trip="'+esc(t.id)+'" style="margin-top:.7rem">Uncheck all</button>'+
+       '</div></details>';
+  return h;
+}
+
+function render(){
+  renderStats(); renderYearOptions();
+  var list=$('list'), shown=visibleTrips();
+
+  $('countLine').textContent = trips.length===0 ? '' :
+    (shown.length===trips.length
+      ? 'Showing all '+trips.length+(trips.length===1?' trip':' trips')
+      : 'Showing '+shown.length+' of '+trips.length+' trips');
+
+  if(trips.length===0){
+    list.innerHTML='<div class="empty"><h2>No trips logged yet</h2>'+
+      '<p>Your first one is waiting. Add a trail, a date, and however much detail you feel like writing down.</p>'+
+      '<button class="btn-primary" data-act="new">+ Add Your First Trip</button></div>';
+    return;
+  }
+  if(shown.length===0){
+    list.innerHTML='<div class="empty"><h2>No trips match that search</h2>'+
+      '<p>Try a different word, or set the filters back to “All.”</p>'+
+      '<button class="btn-secondary" data-act="clear">Clear Filters</button></div>';
+    return;
+  }
+
+  var html='';
+  for(var i=0;i<shown.length;i++){
+    var t=shown[i], chips='';
+
+    if(t.type==='multi'){
+      var dn = t.days ? t.days.length : 0;
+      chips += '<span class="chip trek">🏕️ '+(dn?dn+'-day trip':'Multi-day')+'</span>';
+    }
+    if(t.location) chips += '<span class="chip">📍 '+esc(t.location)+'</span>';
+    if(t.mi!=null) chips += '<span class="chip">🥾 '+trim(t.mi,2)+' mi · '+trim(t.mi*MI_PER_KM,2)+' km</span>';
+    if(t.ft!=null) chips += '<span class="chip gain">▲ '+commas(t.ft)+' ft · '+commas(t.ft*M_PER_FT)+' m gain</span>';
+    if(t.lossFt!=null) chips += '<span class="chip loss">▼ '+commas(t.lossFt)+' ft · '+commas(t.lossFt*M_PER_FT)+' m loss</span>';
+    if(t.finishFt!=null) chips += '<span class="chip finish">🏁 Finish '+commas(t.finishFt)+' ft · '+commas(t.finishFt*M_PER_FT)+' m</span>';
+    if(t.nights) chips += '<span class="chip">🌙 '+t.nights+(t.nights===1?' night':' nights')+'</span>';
+    if(t.difficulty) chips += '<span class="chip diff-'+esc(t.difficulty)+'">'+esc(t.difficulty)+'</span>';
+    if(t.weather || t.tempF!=null){
+      var w = (t.weather||'🌡️');
+      if(t.tempF!=null) w += ' · '+trim(t.tempF,0)+'°F / '+trim(fToC(t.tempF),0)+'°C';
+      chips += '<span class="chip">'+esc(w)+'</span>';
+    }
+    if(t.who) chips += '<span class="chip">👣 '+esc(t.who)+'</span>';
+
+    html += '<article class="trip">'+
+      '<h3>'+esc(t.name)+'</h3>'+
+      '<p class="when">'+esc(dateRangeLabel(t))+'</p>'+
+      (chips?'<div class="chips">'+chips+'</div>':'')+
+      (t.rating?'<div class="stars" aria-label="Rated '+t.rating+' out of 5">'+starRow(t.rating)+'</div>':'')+
+      (t.notes?'<p class="notes">'+esc(t.notes)+'</p>':'')+
+      daysHTML(t)+
+      packingHTML(t)+
+      '<div class="actions">'+
+        '<button class="btn-secondary" data-act="edit" data-trip="'+esc(t.id)+'">✎ Edit</button>'+
+        '<button class="btn-danger" data-act="del" data-trip="'+esc(t.id)+'">Delete</button>'+
+      '</div>'+
+    '</article>';
+  }
+  list.innerHTML = html;
+}
+
+function resetFilters(){
+  $('q').value=''; $('fYear').value=''; $('fDiff').value=''; $('fSort').value='new'; render();
+}
+function findTrip(id){ for(var i=0;i<trips.length;i++){ if(trips[i].id===id) return trips[i]; } return null; }
+
+/* ===========================================================
+   FORM OPEN / CLOSE / SAVE
+   =========================================================== */
+function setStars(v){
+  pendingRating=v;
+  var b=document.querySelectorAll('#starPick button[data-v]');
+  for(var i=0;i<b.length;i++){
+    b[i].setAttribute('aria-pressed', parseInt(b[i].getAttribute('data-v'),10)<=v ? 'true':'false');
+  }
+}
+
+function fillPackCopyOptions(skipId){
+  var sel=$('packCopy');
+  sel.innerHTML='<option value="">— choose a trip to copy its list —</option>';
+  for(var i=0;i<trips.length;i++){
+    var t=trips[i];
+    if(!t.packing || t.id===skipId) continue;
+    var o=document.createElement('option');
+    o.value=t.id;
+    o.textContent=t.name+(t.date?' ('+shortDate(t.date)+')':'');
+    sel.appendChild(o);
+  }
+}
+
+function openForm(id){
+  editingId = id || null;
+  var t = id ? findTrip(id) : null;
+
+  $('sheetTitle').textContent = t ? 'Edit Trip' : 'Add a Trip';
+  $('saveBtn').textContent    = t ? 'Save Changes' : 'Save Trip';
+
+  $('fName').value = t ? t.name : '';
+  $('fDate').value = t ? (t.date||'') : new Date().toISOString().slice(0,10);
+  $('fLoc').value  = t ? (t.location||'') : '';
+
+  $('fMi').value     = t&&t.mi!=null ? trim(t.mi,2) : '';
+  $('fKm').value     = t&&t.mi!=null ? trim(t.mi*MI_PER_KM,2) : '';
+  $('fGainFt').value = t&&t.ft!=null ? trim(t.ft,0) : '';
+  $('fGainM').value  = t&&t.ft!=null ? trim(t.ft*M_PER_FT,0) : '';
+  $('fLossFt').value = t&&t.lossFt!=null ? trim(t.lossFt,0) : '';
+  $('fLossM').value  = t&&t.lossFt!=null ? trim(t.lossFt*M_PER_FT,0) : '';
+  $('fFinFt').value  = t&&t.finishFt!=null ? trim(t.finishFt,0) : '';
+  $('fFinM').value   = t&&t.finishFt!=null ? trim(t.finishFt*M_PER_FT,0) : '';
+
+  $('fNights').value = t&&t.nights ? t.nights : '';
+  $('fDiffIn').value = t ? (t.difficulty||'') : '';
+  $('fWeather').value= t ? (t.weather||'') : '';
+  $('fTempF').value  = t&&t.tempF!=null ? trim(t.tempF,0) : '';
+  $('fTempC').value  = t&&t.tempF!=null ? trim(fToC(t.tempF),0) : '';
+  $('fWho').value    = t ? (t.who||'') : '';
+  $('fPacking').value= t ? (t.packing||'') : '';
+  $('fNotes').value  = t ? (t.notes||'') : '';
+  setStars(t ? (t.rating||0) : 0);
+
+  $('autoTotals').checked = t ? (t.autoTotals!==false) : true;
+
+  /* rebuild the day rows */
+  $('days').innerHTML='';
+  if(t && t.days){
+    for(var i=0;i<t.days.length;i++){
+      var tmp=document.createElement('div');
+      tmp.innerHTML=dayRowHTML(i,t.days[i]);
+      $('days').appendChild(tmp.firstChild);
+    }
+  }
+
+  fillPackCopyOptions(editingId);
+  setMode(t ? (t.type||'day') : 'day');
+  updateCalcNote();
+
+  $('overlay').classList.add('open');
+  document.body.style.overflow='hidden';
+  setTimeout(function(){ $('fName').focus(); },60);
+}
+
+function closeForm(){
+  $('overlay').classList.remove('open');
+  document.body.style.overflow='';
+  editingId=null;
+}
+
+function removeTrip(id){
+  var t=findTrip(id); if(!t) return;
+  if(!confirm('Delete "'+t.name+'"?\n\nThis can\'t be undone.')) return;
+  trips=trips.filter(function(x){ return x.id!==id; });
+  saveData(); render();
+}
+
+/* ===========================================================
+   BACKUP
+   =========================================================== */
+function exportBackup(){
+  if(trips.length===0){ alert('There are no trips to back up yet.'); return; }
+  var payload={app:"Faith's Trail Log",version:3,savedOn:new Date().toISOString(),trips:trips};
+  var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  var url=URL.createObjectURL(blob), a=document.createElement('a');
+  a.href=url; a.download='faith-trail-log-'+new Date().toISOString().slice(0,10)+'.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); },1000);
+}
+
+function importBackup(file){
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    var data;
+    try{ data=JSON.parse(ev.target.result); }
+    catch(err){ alert('That file could not be read. Please choose a backup file saved from Trail Log.'); return; }
+
+    var incoming = Array.isArray(data) ? data : (data && Array.isArray(data.trips) ? data.trips : null);
+    if(!incoming){ alert('That doesn\'t look like a Trail Log backup file.'); return; }
+
+    if(trips.length>0){
+      var ok=confirm('This backup contains '+incoming.length+' trip(s).\n'+
+        'You currently have '+trips.length+' trip(s) on this device.\n\n'+
+        'Click OK to ADD the backup trips to your log.\n(Trips already here won\'t be duplicated.)');
+      if(!ok) return;
+    }
+
+    var have={};
+    for(var i=0;i<trips.length;i++) have[trips[i].id]=true;
+
+    var added=0;
+    for(var j=0;j<incoming.length;j++){
+      var t=incoming[j];
+      if(!t||!t.name) continue;
+      if(!t.id) t.id='tr_'+Date.now()+'_'+j;
+      if(have[t.id]) continue;
+      if(!t.type) t.type=(t.nights>0)?'multi':'day';
+      if(!Array.isArray(t.days)) t.days=[];
+      if(t.tempF===undefined) t.tempF=(t.temp!==undefined?t.temp:null);
+      if(!t.packing) t.packing='';
+      if(!t.packChecked) t.packChecked={};
+      trips.push(t); have[t.id]=true; added++;
+    }
+    saveData(); render();
+    alert(added+' trip(s) loaded onto this device. They\'ll stay here from now on.');
+  };
+  reader.readAsText(file);
+}
+
+/* ===========================================================
+   WIRING
+   =========================================================== */
+var id = function(x){ return x; };
+linkPair($('fMi'),$('fKm'),     function(v){return v*MI_PER_KM;}, function(v){return v/MI_PER_KM;}, 2,2);
+linkPair($('fGainFt'),$('fGainM'), function(v){return v*M_PER_FT;}, function(v){return v/M_PER_FT;}, 0,0, updateCalcNote);
+linkPair($('fLossFt'),$('fLossM'), function(v){return v*M_PER_FT;}, function(v){return v/M_PER_FT;}, 0,0, updateCalcNote);
+linkPair($('fFinFt'),$('fFinM'),   function(v){return v*M_PER_FT;}, function(v){return v/M_PER_FT;}, 0,0, updateCalcNote);
+linkPair($('fTempF'),$('fTempC'),  fToC, cToF, 0,0);   /* temperature uses formulas, not a factor */
+
+$('modeDay').addEventListener('click',function(){ setMode('day'); });
+$('modeMulti').addEventListener('click',function(){ setMode('multi'); });
+
+$('addDayBtn').addEventListener('click',function(){ addDay(); });
+
+$('fillDatesBtn').addEventListener('click',function(){
+  var start=$('fDate').value;
+  if(!start){ alert('Please set the start date first.'); return; }
+  var rows=$('days').querySelectorAll('.day');
+  for(var i=0;i<rows.length;i++){
+    rows[i].querySelector('[data-f="date"]').value = shiftDate(start,i);
+  }
+});
+
+$('autoTotals').addEventListener('change',function(){ applyTotalsLock(); recalcTotals(); });
+
+/* One delegated listener handles conversions inside every day row */
+$('days').addEventListener('input',function(e){
+  var el=e.target, f=el.getAttribute('data-f');
+  if(!f) return;
+  var row=el.closest('.day');
+  function other(name){ return row.querySelector('[data-f="'+name+'"]'); }
+  var v=el.value;
+
+  if(f==='mi')     other('km').value     = v==='' ? '' : trim(num(v)*MI_PER_KM,2);
+  if(f==='km')     other('mi').value     = v==='' ? '' : trim(num(v)/MI_PER_KM,2);
+  if(f==='gainFt') other('gainM').value  = v==='' ? '' : trim(num(v)*M_PER_FT,0);
+  if(f==='gainM')  other('gainFt').value = v==='' ? '' : trim(num(v)/M_PER_FT,0);
+  if(f==='lossFt') other('lossM').value  = v==='' ? '' : trim(num(v)*M_PER_FT,0);
+  if(f==='lossM')  other('lossFt').value = v==='' ? '' : trim(num(v)/M_PER_FT,0);
+  if(f==='tempF')  other('tempC').value  = v==='' ? '' : trim(fToC(num(v)),0);
+  if(f==='tempC')  other('tempF').value  = v==='' ? '' : trim(cToF(num(v)),0);
+
+  recalcTotals();
+});
+$('days').addEventListener('change',function(e){ if(e.target.getAttribute('data-f')) recalcTotals(); });
+
+$('days').addEventListener('click',function(e){
+  var b=e.target.closest('[data-act="removeDay"]');
+  if(!b) return;
+  b.closest('.day').remove();
+  renumberDays(); recalcTotals();
+});
+
+$('packCopy').addEventListener('change',function(){
+  var t=findTrip(this.value);
+  if(!t) return;
+  if($('fPacking').value.trim()!=='' && !confirm('Replace what\'s currently in the packing list?')){
+    this.value=''; return;
+  }
+  $('fPacking').value=t.packing;
+  this.value='';
+});
+
+$('addBtn').addEventListener('click',function(){ openForm(); });
+$('closeBtn').addEventListener('click',closeForm);
+$('cancelBtn').addEventListener('click',closeForm);
+$('overlay').addEventListener('mousedown',function(e){ if(e.target===$('overlay')) closeForm(); });
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape' && $('overlay').classList.contains('open')) closeForm();
+});
+
+$('starPick').addEventListener('click',function(e){
+  var b=e.target.closest('button'); if(!b) return;
+  if(b.id==='clearStars'){ setStars(0); return; }
+  var v=parseInt(b.getAttribute('data-v'),10);
+  setStars(v===pendingRating ? 0 : v);
+});
+
+$('tripForm').addEventListener('submit',function(e){
+  e.preventDefault();
+  var name=$('fName').value.trim();
+  if(!name){ alert('Please give the trip a name.'); $('fName').focus(); return; }
+
+  var existing = editingId ? findTrip(editingId) : null;
+
+  var record={
+    id:         editingId || ('tr_'+Date.now()+'_'+Math.random().toString(36).slice(2,7)),
+    type:       mode,
+    name:       name,
+    date:       $('fDate').value,
+    location:   $('fLoc').value.trim(),
+    mi:         num($('fMi').value),
+    ft:         num($('fGainFt').value),
+    lossFt:     num($('fLossFt').value),
+    finishFt:   num($('fFinFt').value),
+    nights:     num($('fNights').value) || 0,
+    autoTotals: $('autoTotals').checked,
+    difficulty: $('fDiffIn').value,
+    weather:    $('fWeather').value,
+    tempF:      num($('fTempF').value),
+    who:        $('fWho').value.trim(),
+    rating:     pendingRating,
+    packing:    $('fPacking').value,
+    packChecked: existing ? (existing.packChecked||{}) : {},
+    notes:      $('fNotes').value.trim(),
+    days:       mode==='multi' ? readDays() : []
+  };
+
+  if(editingId){
+    for(var i=0;i<trips.length;i++){ if(trips[i].id===editingId) trips[i]=record; }
+  }else{
+    trips.push(record);
+  }
+  saveData(); closeForm(); render();
+});
+
+$('exportBtn').addEventListener('click',exportBackup);
+$('importBtn').addEventListener('click',function(){ $('fileInput').click(); });
+$('fileInput').addEventListener('change',function(e){
+  if(e.target.files && e.target.files[0]) importBackup(e.target.files[0]);
+  e.target.value='';
+});
+
+/* Delegated clicks on the trip list */
+$('list').addEventListener('click',function(e){
+  var b=e.target.closest('[data-act]'); if(!b) return;
+  var act=b.getAttribute('data-act'), tid=b.getAttribute('data-trip');
+  if(act==='new')   openForm();
+  if(act==='clear') resetFilters();
+  if(act==='edit')  openForm(tid);
+  if(act==='del')   removeTrip(tid);
+  if(act==='unpack'){
+    var t=findTrip(tid); if(!t) return;
+    t.packChecked={}; saveData(); render();
+  }
+});
+
+/* Packing checkboxes save instantly — and we DON'T re-render,
+   so the open panel doesn't snap shut while she's ticking items. */
+$('list').addEventListener('change',function(e){
+  var cb=e.target.closest('.packbox'); if(!cb) return;
+  var t=findTrip(cb.getAttribute('data-trip')); if(!t) return;
+  if(!t.packChecked) t.packChecked={};
+  var i=cb.getAttribute('data-i');
+  if(cb.checked) t.packChecked[i]=true; else delete t.packChecked[i];
+  saveData();
+  /* update just the summary count in place */
+  var det=cb.closest('details');
+  if(det){
+    var boxes=det.querySelectorAll('.packbox'), done=0;
+    for(var k=0;k<boxes.length;k++){ if(boxes[k].checked) done++; }
+    det.querySelector('summary').textContent='🎒 Packing list — '+done+' of '+boxes.length+' packed';
+  }
+});
+
+$('q').addEventListener('input',render);
+$('fYear').addEventListener('change',render);
+$('fDiff').addEventListener('change',render);
+$('fSort').addEventListener('change',render);
+
+/* Start up */
+loadData();
+if(!storageOK) $('storageWarning').style.display='block';
+render();
+</script>
+</body>
+</html>
